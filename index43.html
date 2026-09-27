@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>zeviix Luau Obfuscator</title>
+</head>
+<body style="font-family: monospace; margin: 20px; background: #f4f4f4; color: #333;">
+
+    <h2>Simple Luau Code Obfuscator</h2>
+    <p>Paste your Luau code below, choose options, and click the obfuscate button.</p>
+
+    <div style="margin-bottom: 10px;">
+        <button onclick="loadSample()">Load Sample Code</button>
+        <button onclick="clearAll()">Clear</button>
+    </div>
+
+    <div style="margin-bottom: 15px; background: #fff; padding: 10px; border: 1px solid #ccc;">
+        <strong>Obfuscation Options:</strong><br>
+        <label><input type="checkbox" id="optionComments" checked> Remove comments</label><br>
+        <label><input type="checkbox" id="optionStrings" checked> Encrypt strings (string.char)</label><br>
+        <label><input type="checkbox" id="optionVariables" checked> Mangle local variables (_0x...)</label><br>
+        <label><input type="checkbox" id="optionWhitespace" checked> Remove extra spaces and empty lines</label>
+    </div>
+
+    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 300px;">
+            <label for="inputCode"><strong>Input Code:</strong></label><br>
+            <textarea id="inputCode" rows="15" style="width: 100%; font-family: monospace; padding: 5px; box-sizing: border-box;" placeholder="Paste your code here..."></textarea>
+            <br><br>
+            <button onclick="obfuscateCode()" style="padding: 10px 20px; font-weight: bold; background: #222; color: #fff; cursor: pointer;">Obfuscate Code</button>
+        </div>
+
+        <div style="flex: 1; min-width: 300px;">
+            <label for="outputCode"><strong>Obfuscated Result:</strong></label><br>
+            <textarea id="outputCode" rows="15" style="width: 100%; font-family: monospace; padding: 5px; box-sizing: border-box;" readonly placeholder="Result will appear here..."></textarea>
+            <br><br>
+            <button onclick="copyResult()" style="padding: 10px 20px; cursor: pointer;">Copy Result</button>
+        </div>
+    </div>
+
+    <script>
+        // Sample test code
+        const sampleCode = `-- Test comment
+local player = game:GetService("Players").LocalPlayer
+local message = "Welcome to the game, player!"
+
+local function greet()
+    print(message)
+end
+
+greet()`;
+
+        window.onload = function() {
+            document.getElementById('inputCode').value = sampleCode;
+        };
+
+        function loadSample() {
+            document.getElementById('inputCode').value = sampleCode;
+        }
+
+        function clearAll() {
+            document.getElementById('inputCode').value = '';
+            document.getElementById('outputCode').value = '';
+        }
+
+        function copyResult() {
+            const output = document.getElementById('outputCode');
+            if (!output.value) return;
+            output.select();
+            document.execCommand('copy');
+            alert('Result copied to clipboard!');
+        }
+
+        function obfuscateCode() {
+            let code = document.getElementById('inputCode').value;
+            if (!code.trim()) {
+                alert('Please enter some Luau code first.');
+                return;
+            }
+
+            const removeComments = document.getElementById('optionComments').checked;
+            const encryptStrings = document.getElementById('optionStrings').checked;
+            const mangleVariables = document.getElementById('optionVariables').checked;
+            const removeWhitespace = document.getElementById('optionWhitespace').checked;
+
+            // 1. Remove comments
+            if (removeComments) {
+                code = code.replace(/--\[\[[\s\S]*?\]\]/g, ''); // multi-line
+                code = code.replace(/--.*$/gm, ''); // single-line
+            }
+
+            // 2. Encrypt strings using string.char
+            if (encryptStrings) {
+                code = code.replace(/"([^"\\]*(\\.[^"\\]*)*)"/g, function(match, inner) {
+                    if (inner.length === 0) return '""';
+                    let codes = [];
+                    for (let i = 0; i < inner.length; i++) {
+                        codes.push(inner.charCodeAt(i));
+                    }
+                    return `string.char(${codes.join(', ')})`;
+                });
+            }
+
+            // 3. Mangle local variables
+            if (mangleVariables) {
+                const keywords = new Set([
+                    'local', 'function', 'end', 'if', 'then', 'else', 'elseif',
+                    'for', 'in', 'do', 'while', 'repeat', 'until', 'break',
+                    'return', 'true', 'false', 'nil', 'and', 'or', 'not', 'game', 'print', 'string'
+                ]);
+
+                let foundVariables = new Set();
+                let match;
+                const declarationRegex = /\blocal\s+([a-zA-Z_][a-zA-Z0-9_]*)\b/g;
+
+                while ((match = declarationRegex.exec(code)) !== null) {
+                    if (!keywords.has(match[1])) {
+                        foundVariables.add(match[1]);
+                    }
+                }
+
+                let mapping = {};
+                let counter = 1;
+                foundVariables.forEach(variable => {
+                    let randomName = '_0x' + (counter++).toString(16);
+                    mapping[variable] = randomName;
+                });
+
+                foundVariables.forEach(variable => {
+                    let wordRegex = new RegExp(`\\b${variable}\\b`, 'g');
+                    code = code.replace(wordRegex, mapping[variable]);
+                });
+            }
+
+            // 4. Remove extra spaces and empty lines
+            if (removeWhitespace) {
+                code = code.replace(/[ \t]+/g, ' ');
+                code = code.split('\n').filter(line => line.trim().length > 0).join('\n');
+            }
+
+            document.getElementById('outputCode').value = code;
+        }
+    </script>
+
+</body>
+</html>
